@@ -38,6 +38,10 @@ CHECK_INTERVAL_SECONDS = 0.5    # how often to poll the sensor
 #   3. Within ~2 min you'll get a reply with your API key. Put it below.
 WHATSAPP_PHONE = "+61XXXXXXXXX"   # your number, international format, no spaces
 WHATSAPP_API_KEY = "your_api_key_here"
+
+SEND_TEST_ON_STARTUP = True  # sends one test WhatsApp message immediately when the script starts,
+                              # so you can confirm your credentials work without waiting for motion.
+                              # Set to False once you've confirmed it's working.
 # -----------------------------
 
 GPIO.setmode(GPIO.BCM)
@@ -81,12 +85,16 @@ def send_notification(distance):
         f"?phone={WHATSAPP_PHONE}&text={encoded_message}&apikey={WHATSAPP_API_KEY}"
     )
 
+    print(f"[{datetime.now()}] Sending WhatsApp notification...")
     try:
         response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            print(f"[{datetime.now()}] WhatsApp notification sent (distance={distance}cm)")
+        print(f"[{datetime.now()}] CallMeBot response (status {response.status_code}): {response.text}")
+        if response.status_code == 200 and "Message queued" in response.text:
+            print(f"[{datetime.now()}] WhatsApp notification confirmed sent (distance={distance}cm)")
         else:
-            print(f"[{datetime.now()}] WhatsApp send failed (status {response.status_code}): {response.text}")
+            print(f"[{datetime.now()}] WhatsApp send may have FAILED - check the response text above. "
+                  f"Common causes: wrong phone number format, expired/wrong API key, "
+                  f"or you never sent the activation message to the CallMeBot contact.")
     except requests.exceptions.RequestException as e:
         print(f"[{datetime.now()}] Failed to send WhatsApp notification: {e}")
 
@@ -102,17 +110,29 @@ def main():
     global last_notified
     print("Starting front door motion detector... (Ctrl+C to stop)")
 
+    if SEND_TEST_ON_STARTUP:
+        print(f"[{datetime.now()}] Sending a test WhatsApp message to verify credentials...")
+        send_notification("TEST - 0")
+
     try:
         while True:
             distance = get_distance_cm()
 
+            if distance is None:
+                print(f"[{datetime.now()}] No echo received (sensor timeout) "
+                      f"- check wiring/power")
+            else:
+                print(f"[{datetime.now()}] Distance: {distance} cm")
+
             if distance is not None and distance < DISTANCE_THRESHOLD_CM:
+                print(f"[{datetime.now()}] *** MOTION DETECTED *** ({distance} cm, "
+                      f"threshold is {DISTANCE_THRESHOLD_CM} cm)")
                 if not cooldown_active():
                     send_notification(distance)
                     last_notified = time.time()
                 else:
                     remaining = COOLDOWN_SECONDS - (time.time() - last_notified)
-                    print(f"[{datetime.now()}] Motion detected but in cooldown "
+                    print(f"[{datetime.now()}] Skipping notification - still in cooldown "
                           f"({int(remaining)}s remaining)")
 
             time.sleep(CHECK_INTERVAL_SECONDS)
