@@ -4,8 +4,9 @@ Front door motion detector using an HC-SR04 ultrasonic sensor.
 Wiring:
     VCC  -> 5V
     GND  -> GND
-    TRIG -> GPIO5  (physical pin 29)
-    ECHO -> GPIO6  (physical pin 31)
+    TRIG -> GPIO14 (physical pin 8)
+    ECHO -> GPIO15 (physical pin 10) - through the voltage divider
+    LED  -> GPIO18 (physical pin 12), through a resistor to GND
 
 Note: ECHO outputs 5V but the Pi's GPIO pins are only 3.3V tolerant.
 Make sure you're using a voltage divider (or a logic level shifter) on
@@ -22,8 +23,9 @@ import urllib.parse
 from datetime import datetime
 
 # ---------- Config ----------
-TRIG_PIN = 5
-ECHO_PIN = 6
+TRIG_PIN = 14
+ECHO_PIN = 15
+LED_PIN = 18   # optional visual indicator - lights up when motion is detected
 
 DISTANCE_THRESHOLD_CM = 100     # trigger alert if something is closer than this
 COOLDOWN_SECONDS = 5 * 60       # 5 minute cooldown between notifications
@@ -47,7 +49,9 @@ SEND_TEST_ON_STARTUP = True  # sends one test WhatsApp message immediately when 
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(TRIG_PIN, GPIO.OUT)
 GPIO.setup(ECHO_PIN, GPIO.IN)
+GPIO.setup(LED_PIN, GPIO.OUT)
 GPIO.output(TRIG_PIN, False)
+GPIO.output(LED_PIN, False)
 
 last_notified = None  # timestamp of the last notification sent
 
@@ -127,6 +131,7 @@ def main():
             if distance is not None and distance < DISTANCE_THRESHOLD_CM:
                 print(f"[{datetime.now()}] *** MOTION DETECTED *** ({distance} cm, "
                       f"threshold is {DISTANCE_THRESHOLD_CM} cm)")
+                GPIO.output(LED_PIN, True)
                 if not cooldown_active():
                     send_notification(distance)
                     last_notified = time.time()
@@ -134,6 +139,8 @@ def main():
                     remaining = COOLDOWN_SECONDS - (time.time() - last_notified)
                     print(f"[{datetime.now()}] Skipping notification - still in cooldown "
                           f"({int(remaining)}s remaining)")
+            else:
+                GPIO.output(LED_PIN, False)
 
             time.sleep(CHECK_INTERVAL_SECONDS)
 
@@ -141,6 +148,7 @@ def main():
         print("\nStopping detector...")
 
     finally:
+        GPIO.output(LED_PIN, False)
         GPIO.cleanup()
 
 
