@@ -18,6 +18,7 @@ within DISTANCE_THRESHOLD_CM, with a cooldown so it doesn't spam you.
 import RPi.GPIO as GPIO
 import time
 import requests
+import urllib.parse
 from datetime import datetime
 
 # ---------- Config ----------
@@ -28,8 +29,15 @@ DISTANCE_THRESHOLD_CM = 100     # trigger alert if something is closer than this
 COOLDOWN_SECONDS = 5 * 60       # 5 minute cooldown between notifications
 CHECK_INTERVAL_SECONDS = 0.5    # how often to poll the sensor
 
-NTFY_TOPIC = "your-unique-topic-name"   # change this to something unique/private
-NTFY_URL = f"https://ntfy.sh/{NTFY_TOPIC}"
+# --- WhatsApp via CallMeBot (free) ---
+# Setup (one-time):
+#   1. Save +34 621 331 709 to your phone contacts (double check the current
+#      number at https://www.callmebot.com/blog/free-api-whatsapp-messages/
+#      since it can change).
+#   2. From WhatsApp, message that contact: "I allow callmebot to send me messages"
+#   3. Within ~2 min you'll get a reply with your API key. Put it below.
+WHATSAPP_PHONE = "+61XXXXXXXXX"   # your number, international format, no spaces
+WHATSAPP_API_KEY = "your_api_key_here"
 # -----------------------------
 
 GPIO.setmode(GPIO.BCM)
@@ -65,21 +73,22 @@ def get_distance_cm():
 
 
 def send_notification(distance):
-    """Sends a push notification via ntfy.sh."""
+    """Sends a WhatsApp message via the CallMeBot API."""
+    message = f"🚨 Motion detected at front door ({distance} cm away)"
+    encoded_message = urllib.parse.quote(message)
+    url = (
+        "https://api.callmebot.com/whatsapp.php"
+        f"?phone={WHATSAPP_PHONE}&text={encoded_message}&apikey={WHATSAPP_API_KEY}"
+    )
+
     try:
-        requests.post(
-            NTFY_URL,
-            data=f"Motion detected at front door ({distance} cm away)".encode("utf-8"),
-            headers={
-                "Title": "Front Door Alert",
-                "Priority": "high",
-                "Tags": "warning,door",
-            },
-            timeout=5,
-        )
-        print(f"[{datetime.now()}] Notification sent (distance={distance}cm)")
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            print(f"[{datetime.now()}] WhatsApp notification sent (distance={distance}cm)")
+        else:
+            print(f"[{datetime.now()}] WhatsApp send failed (status {response.status_code}): {response.text}")
     except requests.exceptions.RequestException as e:
-        print(f"[{datetime.now()}] Failed to send notification: {e}")
+        print(f"[{datetime.now()}] Failed to send WhatsApp notification: {e}")
 
 
 def cooldown_active():
