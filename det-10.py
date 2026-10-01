@@ -28,16 +28,9 @@ ECHO_PIN = 15
 LED_PIN = 18   # optional visual indicator - lights up when motion is detected
 
 DISTANCE_THRESHOLD_CM = 100     # trigger alert if something is closer than this
-COOLDOWN_SECONDS = 5 * 60       # 5 minute cooldown between notifications
-CHECK_INTERVAL_SECONDS = 0.5    # how often to poll the sensor
+COOLDOWN_SECONDS = 5       # 5 minute cooldown between notifications
+CHECK_INTERVAL_SECONDS = 2    # how often to poll the sensor
 
-# --- WhatsApp via CallMeBot (free) ---
-# Setup (one-time):
-#   1. Save +34 621 331 709 to your phone contacts (double check the current
-#      number at https://www.callmebot.com/blog/free-api-whatsapp-messages/
-#      since it can change).
-#   2. From WhatsApp, message that contact: "I allow callmebot to send me messages"
-#   3. Within ~2 min you'll get a reply with your API key. Put it below.
 WHATSAPP_PHONE = "+61XXXXXXXXX"   # your number, international format, no spaces
 WHATSAPP_API_KEY = "your_api_key_here"
 
